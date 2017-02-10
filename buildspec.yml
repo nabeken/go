@@ -1,0 +1,14 @@
+version: 0.1
+
+environment_variables:
+  plaintext:
+    CGO_ENABLED: "1"
+    GOROOT_BOOTSTRAP: "/usr/local/go"
+
+phases:
+  install:
+    commands:
+      - apt-get update && apt-get install -y gcc
+  build:
+    commands:
+      - cd src && ./all.bash
