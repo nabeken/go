@@ -85,12 +85,25 @@ func (hs *serverHandshakeStateTLS13) handshake() error {
 	if err := hs.sendServerFinished(); err != nil {
 		return err
 	}
+
 	// Note that at this point we could start sending application data without
 	// waiting for the client's second flight, but the application might not
 	// expect the lack of replay protection of the ClientHello parameters.
 	if _, err := c.flush(); err != nil {
 		return err
 	}
+
+	// See RFC 8446, Section 4.6.1 for when to send New Session Ticket Message.
+	// If we did not request client certificates, at this point we can precompute
+	// the client finished and roll the transcript forward to send session tickets.
+	// The server MAY send a NewSessionTicket immediately upon sending its Finished
+	// rather than waiting for the client Finished.
+	if !hs.requestClientCert() {
+		if err := hs.sendSessionTickets(); err != nil {
+			return err
+		}
+	}
+
 	if err := hs.readClientCertificate(); err != nil {
 		return err
 	}
@@ -925,15 +938,6 @@ func (hs *serverHandshakeStateTLS13) sendServerFinished() error {
 	}
 
 	c.ekm = hs.suite.exportKeyingMaterial(hs.masterSecret, hs.transcript)
-
-	// If we did not request client certificates, at this point we can
-	// precompute the client finished and roll the transcript forward to send
-	// session tickets in our first flight.
-	if !hs.requestClientCert() {
-		if err := hs.sendSessionTickets(); err != nil {
-			return err
-		}
-	}
 
 	return nil
 }
